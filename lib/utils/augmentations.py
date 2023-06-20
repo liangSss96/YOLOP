@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import random
 import math
+from ..config import cfg
 
 
 def augment_hsv(img, hgain=0.5, sgain=0.5, vgain=0.5):
@@ -34,12 +35,12 @@ def random_perspective(combination, targets=(), degrees=10, translate=.1, scale=
     height = img.shape[0] + border[0] * 2  # shape(h,w,c)
     width = img.shape[1] + border[1] * 2
 
-    # Center
+    # Center   平移  左下角平移到了中心
     C = np.eye(3)
     C[0, 2] = -img.shape[1] / 2  # x translation (pixels)
     C[1, 2] = -img.shape[0] / 2  # y translation (pixels)
 
-    # Perspective
+    # Perspective    仿射变换
     P = np.eye(3)
     P[2, 0] = random.uniform(-perspective, perspective)  # x perspective (about y)
     P[2, 1] = random.uniform(-perspective, perspective)  # y perspective (about x)
@@ -47,29 +48,28 @@ def random_perspective(combination, targets=(), degrees=10, translate=.1, scale=
     # Rotation and Scale
     R = np.eye(3)
     a = random.uniform(-degrees, degrees)
-    # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
     s = random.uniform(1 - scale, 1 + scale)
-    # s = 2 ** random.uniform(-scale, scale)
     R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
 
-    # Shear
+    # Shear 拉伸
     S = np.eye(3)
     S[0, 1] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # x shear (deg)
     S[1, 0] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # y shear (deg)
 
-    # Translation
+    # Translation  #平移
     T = np.eye(3)
     T[0, 2] = random.uniform(0.5 - translate, 0.5 + translate) * width  # x translation (pixels)
     T[1, 2] = random.uniform(0.5 - translate, 0.5 + translate) * height  # y translation (pixels)
 
     # Combined rotation matrix
     M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
+    print(M)
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
-        if perspective:
+        if perspective:  # perspective 透视变换
             img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
             gray = cv2.warpPerspective(gray, M, dsize=(width, height), borderValue=0)
             line = cv2.warpPerspective(line, M, dsize=(width, height), borderValue=0)
-        else:  # affine
+        else:  # affine 仿射变换
             img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
             gray = cv2.warpAffine(gray, M[:2], dsize=(width, height), borderValue=0)
             line = cv2.warpAffine(line, M[:2], dsize=(width, height), borderValue=0)
@@ -85,8 +85,9 @@ def random_perspective(combination, targets=(), degrees=10, translate=.1, scale=
     if n:
         # warp points
         xy = np.ones((n * 4, 3))
+        print(xy.shape)
         xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
-        xy = xy @ M.T  # transform
+        xy = xy @ M.T  # transform   xy的一行为一个齐次的点
         if perspective:
             xy = (xy[:, :2] / xy[:, 2:3]).reshape(n, 8)  # rescale
         else:  # affine
@@ -171,23 +172,24 @@ def cutout(combination, labels):
 def letterbox(combination, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True):
     """Resize the input image and automatically padding to suitable shape :https://zhuanlan.zhihu.com/p/172121380"""
     # Resize image to a 32-pixel-multiple rectangle https://github.com/ultralytics/yolov3/issues/232
-    img, gray, line = combination
+    img, gray, line = combination  # img, seg_label, lane_label
     shape = img.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
         new_shape = (new_shape, new_shape)
-
+    
     # Scale ratio (new / old)
     r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+    print("result r: ", r)
     if not scaleup:  # only scale down, do not scale up (for better test mAP)
         r = min(r, 1.0)
 
     # Compute padding
     ratio = r, r  # width, height ratios
-    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r)) # img2new_img
     dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
     if auto:  # minimum rectangle
         dw, dh = np.mod(dw, 32), np.mod(dh, 32)  # wh padding
-    elif scaleFill:  # stretch
+    elif scaleFill:  # stretch  失真的填满整个区域
         dw, dh = 0.0, 0.0
         new_unpad = (new_shape[1], new_shape[0])
         ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
@@ -202,7 +204,8 @@ def letterbox(combination, new_shape=(640, 640), color=(114, 114, 114), auto=Tru
 
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-
+    # 在上述代码中，img 是需要添加边框的图像。top、bottom、left 和 right 分别表示在每个边界上添加的像素数。
+    #   cv2.BORDER_CONSTANT 表示为边框使用单一颜色，而 color 参数表示所选颜色。在图像的边界上添加边框的效果。这在图像处理中常用于扩展图像大小、填充边缘或创建视觉效果。
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     gray = cv2.copyMakeBorder(gray, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)  # add border
     line = cv2.copyMakeBorder(line, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)  # add border
@@ -248,9 +251,11 @@ def letterbox_for_img(img, new_shape=(640, 640), color=(114, 114, 114), auto=Tru
     return img, ratio, (dw, dh)
 
 
+
+# 纵横比，小目标，细长目标
 def _box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1):  # box1(4,n), box2(4,n)
     # Compute candidate boxes: box1 before augment, box2 after augment, wh_thr (pixels), aspect_ratio_thr, area_ratio
     w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
     w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
-    ar = np.maximum(w2 / (h2 + 1e-16), h2 / (w2 + 1e-16))  # aspect ratio
+    ar = np.maximum(w2 / (h2 + 1e-16), h2 / (w2 + 1e-16))  # aspect ratio  纵横比
     return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + 1e-16) > area_thr) & (ar < ar_thr)  # candidates

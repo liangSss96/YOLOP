@@ -12,7 +12,7 @@ _C.PRINT_FREQ = 20
 _C.AUTO_RESUME =False       # Resume from the last training interrupt
 _C.NEED_AUTOANCHOR = False      # Re-select the prior anchor(k-means)    When training from scratch (epoch=0), set it to be ture!
 _C.DEBUG = False
-_C.num_seg_class = 2
+_C.num_seg_class = 2  # 分割的类别数，后期可能改为实例分割
 
 # Cudnn related params
 _C.CUDNN = CN()
@@ -60,14 +60,19 @@ _C.DATASET.TEST_SET = 'val'
 _C.DATASET.DATA_FORMAT = 'jpg'
 _C.DATASET.SELECT_DATA = False
 _C.DATASET.ORG_IMG_SIZE = [720, 1280]
+# LS appended
+_C.DATASET.CLASS_NUMBER = 3
+_C.DATASET.CLASS_NAMES = ['car', 'pedestrian', 'cyclist']
 
 # training data augmentation
 _C.DATASET.FLIP = True
 _C.DATASET.SCALE_FACTOR = 0.25
-_C.DATASET.ROT_FACTOR = 10
+_C.DATASET.ROT_FACTOR = 10 # degree
 _C.DATASET.TRANSLATE = 0.1
 _C.DATASET.SHEAR = 0.0
 _C.DATASET.COLOR_RGB = False
+_C.DATASET.LR_FLIP = True
+_C.DATASET.UD_FLIP = False
 _C.DATASET.HSV_H = 0.015  # image HSV-Hue augmentation (fraction)
 _C.DATASET.HSV_S = 0.7  # image HSV-Saturation augmentation (fraction)
 _C.DATASET.HSV_V = 0.4  # image HSV-Value augmentation (fraction)
@@ -76,6 +81,7 @@ _C.DATASET.HSV_V = 0.4  # image HSV-Value augmentation (fraction)
 
 # train
 _C.TRAIN = CN(new_allowed=True)
+_C.TRAIN.SINGLE_CLS = True  # 是否就一个类别
 _C.TRAIN.LR0 = 0.001  # initial learning rate (SGD=1E-2, Adam=1E-3)
 _C.TRAIN.LRF = 0.2  # final OneCycleLR learning rate (lr0 * lrf)
 _C.TRAIN.WARMUP_EPOCHS = 3.0
@@ -95,6 +101,7 @@ _C.TRAIN.END_EPOCH = 240
 _C.TRAIN.VAL_FREQ = 1
 _C.TRAIN.BATCH_SIZE_PER_GPU =24
 _C.TRAIN.SHUFFLE = True
+_C.TRAIN.AUTO = False
 
 _C.TRAIN.IOU_THRESHOLD = 0.2
 _C.TRAIN.ANCHOR_THRESHOLD = 4.0

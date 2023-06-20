@@ -53,15 +53,16 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
 
     def metric(k, wh):  # compute metrics
         r = wh[:, None] / k[None]
-        x = torch.min(r, 1. / r).min(2)[0]  # ratio metric
+        x = torch.min(r, 1. / r).min(2)[0]  # ratio metric  
         # x = wh_iou(wh, torch.tensor(k))  # iou metric
-        return x, x.max(1)[0]  # x, best_x
+        return x, x.max(1)[0]  # x, best_x  x.max(1)[0] 能最佳匹配的那个anchor
 
     def anchor_fitness(k):  # mutation fitness
         _, best = metric(torch.tensor(k, dtype=torch.float32), wh)
         return (best * (best > thr).float()).mean()  # fitness
 
     def print_results(k):
+        print("what is K: ", k, " K's shape: ", k.shape)
         k = k[np.argsort(k.prod(1))]  # sort small to large
         x, best = metric(k, wh0)
         bpr, aat = (best > thr).float().mean(), (x > thr).float().mean() * n  # best possible recall, anch > thr
@@ -77,8 +78,8 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
     else:
         dataset = path  # dataset
 
-    labels = [db['label'] for db in dataset.db]
-    labels = np.vstack(labels)
+    labels = [db['label'] for db in dataset.db]  # [[a,5], [b,5], [c,5]]
+    labels = np.vstack(labels)   # [a,5], [b,5], [c,5]
     if not (labels[:, 1:] <= 1).all():
         # normalize label
         labels[:, [2, 4]] /= dataset.shapes[0]
@@ -86,7 +87,7 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
     # Get label wh
     shapes = img_size * dataset.shapes / dataset.shapes.max()
     # wh0 = np.concatenate([l[:, 3:5] * shapes for l in labels])  # wh
-    wh0 = labels[:, 3:5] * shapes
+    wh0 = labels[:, 3:5] * shapes    # truly wh
     # Filter
     i = (wh0 < 3.0).any(1).sum()
     if i:

@@ -125,6 +125,7 @@ def initialize_weights(model):
             m.momentum = 0.03
         elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6]:
         # elif t in [nn.LeakyReLU, nn.ReLU, nn.ReLU6]:
+        # 这样设置可以让激活函数直接在原地（inplace）进行计算，减少内存的占用和计算的开销。
             m.inplace = True
 
 

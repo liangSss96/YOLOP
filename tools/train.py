@@ -117,6 +117,7 @@ def main():
         else select_device(logger, 'cpu')
     
     print("##### DEVICE: ", device)
+    print("##### BATCH_SIZE: ", cfg.TRAIN.BATCH_SIZE_PER_GPU* len(cfg.GPUS))
 
     if args.local_rank != -1:
         assert torch.cuda.device_count() > args.local_rank
@@ -315,6 +316,7 @@ def main():
     if rank in [-1, 0]:
         if cfg.NEED_AUTOANCHOR:
             logger.info("begin check anchors")
+            # anchor的检测
             run_anchor(logger,train_dataset, model=model, thr=cfg.TRAIN.ANCHOR_THRESHOLD, imgsz=min(cfg.MODEL.IMAGE_SIZE))
         else:
             logger.info("anchors loaded successfully")
