@@ -4,7 +4,7 @@ Version: 2.0
 Autor: ls
 Date: 2023-06-12 10:54:11
 LastEditors: ls
-LastEditTime: 2023-06-20 11:37:02
+LastEditTime: 2023-06-27 18:47:29
 '''
 import numpy as np
 import json
@@ -98,32 +98,34 @@ class BddDataset(AutoDriveDataset):
         print('building database...')
         gt_db = []
         height, width = self.shapes  # ORG_IMG_SIZE
-        for label_file in track(list(self.label_root)):
-            label_path = str(label_file)
-            mask_path = label_path.replace(str(self.label_root), str(self.mask_root)).replace(".json", ".png")
-            image_path = label_path.replace(str(self.label_root), str(self.img_root)).replace(".json", ".jpg")
-            lane_path = label_path.replace(str(self.label_root), str(self.lane_root)).replace(".json", ".png")
-            with open(label_path, 'r') as f:
-                label = json.load(f)
-            data = label['frames'][0]['objects']
-            data = self.filter_data(data)
-            gt = np.zeros((len(data), 5))   # 某一个标注文件的gt列表
-            for idx, obj in enumerate(data):
-                category = obj['category']
-                if category == "traffic light":
-                    color = obj['attributes']['trafficLightColor']
-                    category = "tl_" + color
-                if category in id_dict.keys():
-                    x1 = float(obj['box2d']['x1'])
-                    y1 = float(obj['box2d']['y1'])
-                    x2 = float(obj['box2d']['x2'])
-                    y2 = float(obj['box2d']['y2'])
-                    cls_id = id_dict[category]
-                    if self.single_cls:
-                         cls_id=0
-                    gt[idx][0] = cls_id
-                    box = convert((width, height), (x1, x2, y1, y2))   # 归一化后的xywh
-                    gt[idx][1:] = list(box)
+        for image_file in track(list(self.img_root.iterdir())):
+            image_path = str(image_file)
+            mask_path = image_path.replace(str(self.img_root), str(self.mask_root)).replace(".jpg", ".png")
+            label_path = image_path.replace(str(self.img_root), str(self.label_root)).replace(".jpg", ".json")
+            lane_path = image_path.replace(str(self.img_root), str(self.lane_root)).replace(".jpg", ".png")
+            gt = np.zeros((0, 5))   # 某一个标注文件的gt列表
+            if self.cfg.DATASET.LABELISAVAILABLE:
+                with open(label_path, 'r') as f:
+                    label = json.load(f)
+                data = label['frames'][0]['objects']
+                data = self.filter_data(data)
+                gt = np.zeros((len(data), 5)) 
+                for idx, obj in enumerate(data):
+                    category = obj['category']
+                    if category == "traffic light":
+                        color = obj['attributes']['trafficLightColor']
+                        category = "tl_" + color
+                    if category in id_dict.keys():
+                        x1 = float(obj['box2d']['x1'])
+                        y1 = float(obj['box2d']['y1'])
+                        x2 = float(obj['box2d']['x2'])
+                        y2 = float(obj['box2d']['y2'])
+                        cls_id = id_dict[category]
+                        if self.single_cls:
+                            cls_id=0
+                        gt[idx][0] = cls_id
+                        box = convert((width, height), (x1, x2, y1, y2))   # 归一化后的xywh
+                        gt[idx][1:] = list(box)
                 
 
             rec = [{
@@ -162,3 +164,4 @@ if __name__ == "__main__":
     print(cfg.TRAIN.SINGLE_CLS)
     dataset = BddDataset(cfg, True, [640, 640])
     print(len(dataset))
+    print(dataset[0])

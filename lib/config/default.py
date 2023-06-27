@@ -78,6 +78,10 @@ _C.DATASET.HSV_S = 0.7  # image HSV-Saturation augmentation (fraction)
 _C.DATASET.HSV_V = 0.4  # image HSV-Value augmentation (fraction)
 # TODO: more augmet params to add
 
+# 是否有相应的数据集
+_C.DATASET.LABELISAVAILABLE = True   # 目标识别标注文件
+_C.DATASET.SEGISAVAILABLE = True     # 可行驶区域标注文件
+_C.DATASET.LLISAVAILABLE = True      # 车道线标注文件
 
 # train
 _C.TRAIN = CN(new_allowed=True)
@@ -101,7 +105,7 @@ _C.TRAIN.END_EPOCH = 240
 _C.TRAIN.VAL_FREQ = 1
 _C.TRAIN.BATCH_SIZE_PER_GPU =24
 _C.TRAIN.SHUFFLE = True
-_C.TRAIN.AUTO = False
+_C.TRAIN.AUTOFILL = False
 
 _C.TRAIN.IOU_THRESHOLD = 0.2
 _C.TRAIN.ANCHOR_THRESHOLD = 4.0

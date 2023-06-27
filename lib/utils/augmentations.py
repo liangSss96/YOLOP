@@ -17,7 +17,14 @@ def augment_hsv(img, hgain=0.5, sgain=0.5, vgain=0.5):
     lut_hue = ((x * r[0]) % 180).astype(dtype)
     lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
     lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
+    '''
+    cv2.LUT()是OpenCV中的一个函数，用于执行查找表转换，它将输入图像中的每个像素的值转换为输出图像中的像素值。 
+    这个函数主要的作用是将输入图像中的每个像素值与查找表（也称为LUT）中的相应值进行匹配，然后将结果映射到输出图像中。
 
+    cv2.LUT()函数通常用于图像增强，比如调整对比度、明暗度等。它可以通过查找表中定制的映射，将输入图像像素的灰度级
+    调整为更适合我们的观察或后续处理的灰度级。 查找表是一种映射表，将来自输入图像的像素值映射到输出图像中的值，以
+    用于颜色空间转换和图像增强等操作。
+    '''
     img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
     cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
 
@@ -27,7 +34,7 @@ def augment_hsv(img, hgain=0.5, sgain=0.5, vgain=0.5):
     #         img[:, :, i] = cv2.equalizeHist(img[:, :, i])
 
 
-def random_perspective(combination, targets=(), degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0, border=(0, 0)):
+def random_perspective(cfg, combination, targets=(), degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0, border=(0, 0)):
     """combination of img transform"""
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
@@ -67,12 +74,16 @@ def random_perspective(combination, targets=(), degrees=10, translate=.1, scale=
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
         if perspective:  # perspective 透视变换
             img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
-            gray = cv2.warpPerspective(gray, M, dsize=(width, height), borderValue=0)
-            line = cv2.warpPerspective(line, M, dsize=(width, height), borderValue=0)
+            if cfg.DATASET.SEGISAVAILABLE:
+                gray = cv2.warpPerspective(gray, M, dsize=(width, height), borderValue=0)
+            if cfg.DATASET.LLISAVAILABLE:
+                line = cv2.warpPerspective(line, M, dsize=(width, height), borderValue=0)
         else:  # affine 仿射变换
             img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
-            gray = cv2.warpAffine(gray, M[:2], dsize=(width, height), borderValue=0)
-            line = cv2.warpAffine(line, M[:2], dsize=(width, height), borderValue=0)
+            if cfg.DATASET.SEGISAVAILABLE:
+                gray = cv2.warpAffine(gray, M[:2], dsize=(width, height), borderValue=0)
+            if cfg.DATASET.LLISAVAILABLE:  
+                line = cv2.warpAffine(line, M[:2], dsize=(width, height), borderValue=0)
 
     # Visualize
     # import matplotlib.pyplot as plt

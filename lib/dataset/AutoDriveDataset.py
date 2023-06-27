@@ -47,7 +47,7 @@ class AutoDriveDataset(Dataset):
         self.mask_root = mask_root / indicator
         self.lane_root = lane_root / indicator
         # self.label_list = self.label_root.iterdir()
-        self.label_root = self.label_root.iterdir()
+        # self.img_root = self.img_root.iterdir()
 
         self.db = []
 
@@ -261,14 +261,29 @@ class AutoDriveDataset(Dataset):
         data = self.db[idx]
         img = cv2.imread(data["image"], cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        if self.cfg.num_seg_class == 3:
-            seg_label = cv2.imread(data["mask"])
+        print(" load img *****************", img[0][0])
+
+        if self.cfg.DATASET.SEGISAVAILABLE:
+            if self.cfg.num_seg_class == 3:
+                seg_label = cv2.imread(data["mask"])
+            else:
+                seg_label = cv2.imread(data["mask"], 0)  # 单通道的灰度图像
         else:
-            seg_label = cv2.imread(data["mask"], 0)  # 单通道的灰度图像
-        lane_label = cv2.imread(data["lane"], 0)
+            if self.cfg.num_seg_class == 3:
+                seg_label = np.zeros_like(img, dtype=np.uint8)
+            else:
+                seg_label = np.zeros(img.shape[:2], dtype=np.uint8)
+
+        if self.cfg.DATASET.LLISAVAILABLE:  
+            lane_label = cv2.imread(data["lane"], 0)
+        else:
+            lane_label = np.zeros(img.shape[:2], dtype=np.uint8)
+
+
         print(img.shape)
         print(lane_label.shape)
         print(seg_label.shape)
+
         resized_shape = self.inputsize   # 模型的输入图像大小
         # if isinstance(resized_shape, list):
         #     resized_shape = max(resized_shape)   # 输入图像的长边
@@ -283,12 +298,14 @@ class AutoDriveDataset(Dataset):
             seg_label = cv2.resize(seg_label, (int(w0 * r), int(h0 * r)), interpolation=interp)
             lane_label = cv2.resize(lane_label, (int(w0 * r), int(h0 * r)), interpolation=interp)
         h, w = img.shape[:2]  # 新的尺寸，图像的长宽比前后是不变的
+        print(" resize img *****************", img[0][0])
         print("h, w: ", h, w)
         '''
         TODO
         '''
-        (img, seg_label, lane_label), ratio, pad = letterbox((img, seg_label, lane_label), resized_shape, auto=self.cfg.TRAIN.AUTO, scaleup=self.is_train)
+        (img, seg_label, lane_label), ratio, pad = letterbox((img, seg_label, lane_label), resized_shape, auto=self.cfg.TRAIN.AUTOFILL, scaleup=self.is_train)
         shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
+        print(" letterbox img *****************", img[0][0])
         # ratio = (w / w0, h / h0)
         # print(resized_shape)
         
@@ -307,6 +324,7 @@ class AutoDriveDataset(Dataset):
         if self.is_train:
             combination = (img, seg_label, lane_label)
             (img, seg_label, lane_label), labels = random_perspective(
+                self.cfg,
                 combination=combination,
                 targets=labels,
                 degrees=self.cfg.DATASET.ROT_FACTOR,  # 旋转
@@ -314,10 +332,11 @@ class AutoDriveDataset(Dataset):
                 scale=self.cfg.DATASET.SCALE_FACTOR,  # 缩放
                 shear=self.cfg.DATASET.SHEAR  
             )
+            print(" random_perspective img *****************", img[0][0])
             #print(labels.shape)
             augment_hsv(img, hgain=self.cfg.DATASET.HSV_H, sgain=self.cfg.DATASET.HSV_S, vgain=self.cfg.DATASET.HSV_V)
             # img, seg_label, labels = cutout(combination=combination, labels=labels)
-
+            print(" augment_hsv img *****************", img[0][0])
             if len(labels):
                 # convert xyxy to xywh
                 labels[:, 1:5] = xyxy2xywh(labels[:, 1:5])
@@ -329,23 +348,26 @@ class AutoDriveDataset(Dataset):
             # if self.is_train:
             # random left-right flip
             # 翻转问题
-            lr_flip = self.cfg.DATASET.LR_FLIP
-            if lr_flip and random.random() < 0.5:
-                img = np.fliplr(img)
-                seg_label = np.fliplr(seg_label)
-                lane_label = np.fliplr(lane_label)
-                if len(labels):
-                    labels[:, 1] = 1 - labels[:, 1]
+            img_name = data["image"].split("/")[-1]
+            print(img_name)
+            if not img_name.startswith("tl"):
+                lr_flip = self.cfg.DATASET.LR_FLIP
+                if lr_flip and random.random() < 0.5:
+                    img = np.fliplr(img)
+                    seg_label = np.fliplr(seg_label)
+                    lane_label = np.fliplr(lane_label)
+                    if len(labels):
+                        labels[:, 1] = 1 - labels[:, 1]
 
-            # random up-down flip
-            ud_flip = self.cfg.DATASET.UD_FLIP
-            if ud_flip and random.random() < 0.5:
-                img = np.flipud(img)
-                seg_label = np.filpud(seg_label)
-                lane_label = np.filpud(lane_label)
-                if len(labels):
-                    labels[:, 2] = 1 - labels[:, 2]
-        
+                # random up-down flip
+                ud_flip = self.cfg.DATASET.UD_FLIP
+                if ud_flip and random.random() < 0.5:
+                    img = np.flipud(img)
+                    seg_label = np.filpud(seg_label)
+                    lane_label = np.filpud(lane_label)
+                    if len(labels):
+                        labels[:, 2] = 1 - labels[:, 2]
+            print(" uplf img *****************", img[0][0])
         else:
             if len(labels):
                 # convert xyxy to xywh
@@ -354,19 +376,24 @@ class AutoDriveDataset(Dataset):
                 # Normalize coordinates 0 - 1
                 labels[:, [2, 4]] /= img.shape[0]  # height
                 labels[:, [1, 3]] /= img.shape[1]  # width
-
+        # [prob, class, x, y, w, h]
         labels_out = torch.zeros((len(labels), 6))
         if len(labels):
             labels_out[:, 1:] = torch.from_numpy(labels)
         # Convert
         # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         # img = img.transpose(2, 0, 1)
-        # 返回一个连续的array，其内存是连续的
+        # 返回一个连续的array，其内存是连续的这通常能够提高计算效率，特别是在涉及大量数据的情况下。
+        # 在计算机视觉中，经常需要对图像进行处理，而某些操作要求图像是连续的。
         img = np.ascontiguousarray(img)
+        print(" ascontiguousarray img *****************", img[0][0])
+        cv2.imshow("sss", img)
+        cv2.waitKey(5000)
         # seg_label = np.ascontiguousarray(seg_label)
         # if idx == 0:
         #     print(seg_label[:,:,0])
-
+        
+        # 前后背景的图
         if self.cfg.num_seg_class == 3:
             _,seg0 = cv2.threshold(seg_label[:,:,0],128,255,cv2.THRESH_BINARY)
             _,seg1 = cv2.threshold(seg_label[:,:,1],1,255,cv2.THRESH_BINARY)
