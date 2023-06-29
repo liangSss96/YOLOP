@@ -18,6 +18,7 @@ def build_targets(cfg, predictions, targets, model):
     [8,8,8,8]
     targets[3,x,7]
     t [index, class, x, y, w, h, head_index]
+    t [index, class, x, y, w, h, anchor_index]?
     '''
     # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
     det = model.module.model[model.module.detector_index] if is_parallel(model) \
@@ -30,33 +31,38 @@ def build_targets(cfg, predictions, targets, model):
     gain = torch.ones(7, device=targets.device)  # normalized to gridspace gain
     ai = torch.arange(na, device=targets.device).float().view(na, 1).repeat(1, nt)  # same as .repeat_interleave(nt)
     targets = torch.cat((targets.repeat(na, 1, 1), ai[:, :, None]), 2)  # append anchor indices
+    # targets [index, class, x, y, w, h, anchor_index]?
     
     g = 0.5  # bias
+    # anchor中心点的偏移
     off = torch.tensor([[0, 0],
                         [1, 0], [0, 1], [-1, 0], [0, -1],  # j,k,l,m
                         # [1, 1], [1, -1], [-1, 1], [-1, -1],  # jk,jm,lk,lm
                         ], device=targets.device).float() * g  # offsets
-    
     for i in range(det.nl):
+        # anchors
         anchors = det.anchors[i] #[3,2]
+        # predictions (3,bs,3,w,w,5+cls)
         gain[2:6] = torch.tensor(predictions[i].shape)[[3, 2, 3, 2]]  # xyxy gain
-        # Match targets to anchors
+        # Match targets to anchors  标注的xywh是百分比的，按照此层特征图的大小进行放大
         t = targets * gain
 
-        if nt:
+        # https://zhuanlan.zhihu.com/p/415071583
+        if nt: # 此batch中有无目标
             # Matches
             r = t[:, :, 4:6] / anchors[:, None]  # wh ratio
             j = torch.max(r, 1. / r).max(2)[0] < cfg.TRAIN.ANCHOR_THRESHOLD  # compare
             # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
-            t = t[j]  # filter
+            t = t[j]  # filter ---> [n,7]
 
             # Offsets
             gxy = t[:, 2:4]  # grid xy
+            # 将以图像左上角为原点的坐标变换为以图像右下角为原点的坐标
             gxi = gain[[2, 3]] - gxy  # inverse
-            j, k = ((gxy % 1. < g) & (gxy > 1.)).T
-            l, m = ((gxi % 1. < g) & (gxi > 1.)).T
+            j, k = ((gxy % 1. < g) & (gxy > 1.)).T  # 原点为图像左上角
+            l, m = ((gxi % 1. < g) & (gxi > 1.)).T   # 原点为图像右下角
             j = torch.stack((torch.ones_like(j), j, k, l, m))
-            t = t.repeat((5, 1, 1))[j]
+            t = t.repeat((5, 1, 1))[j]  #  --->  [n_1, 7]
             offsets = (torch.zeros_like(gxy)[None] + off[:, None])[j]
         else:
             t = targets[0]

@@ -33,6 +33,7 @@ from lib.utils.utils import get_optimizer
 from lib.utils.utils import save_checkpoint
 from lib.utils.utils import create_logger, select_device
 from lib.utils import run_anchor
+from lib.utils.utils import intersect_dicts
 
 
 def parse_args():
@@ -44,18 +45,22 @@ def parse_args():
     #                     type=str)
 
     # philly
+    # 输出的模型地址
     parser.add_argument('--modelDir',
                         help='model directory',
                         type=str,
                         default='')
+    # 输出的日志
     parser.add_argument('--logDir',
                         help='log directory',
                         type=str,
                         default='runs/')
+    # 没啥用
     parser.add_argument('--dataDir',
                         help='data directory',
                         type=str,
                         default='')
+    # 预训练模型地址
     parser.add_argument('--prevModelDir',
                         help='prev Model directory',
                         type=str,
@@ -84,6 +89,7 @@ def main():
 
     rank = global_rank
     print("RANK: ", rank)
+
     # TODO: handle distributed training logger
     # set the logger, tb_log_dir means tensorboard logdir
 
@@ -103,16 +109,17 @@ def main():
         writer_dict = None
 
     # cudnn related setting
+    # 自动寻找最适合当前硬件的卷积算法
     cudnn.benchmark = cfg.CUDNN.BENCHMARK
+    # 确保每次运行时卷积操作的输出是确定性的，即对于给定的输入和参数，输出始终相同。这对于调试和复现实验结果非常重要 与上述可能冲突
     torch.backends.cudnn.deterministic = cfg.CUDNN.DETERMINISTIC
+    # 控制PyTorch是否使用cuDNN加速
     torch.backends.cudnn.enabled = cfg.CUDNN.ENABLED
-
-    # print("############: ", os.environ)
 
     # bulid up model
     # start_time = time.time()
     print("begin to bulid up model...")
-    # DP mode
+    # DP mode  显示所有gpu的信息
     device = select_device(logger, batch_size=cfg.TRAIN.BATCH_SIZE_PER_GPU* len(cfg.GPUS)) if not cfg.DEBUG \
         else select_device(logger, 'cpu')
     
@@ -123,12 +130,13 @@ def main():
         assert torch.cuda.device_count() > args.local_rank
         torch.cuda.set_device(args.local_rank)
         device = torch.device('cuda', args.local_rank)
+        # 多GPU通信框架
         dist.init_process_group(backend='nccl', init_method='env://')  # distributed backend
     
     print("load model to device")
     model = get_net(cfg).to(device)
     # print("load finished")
-    #model = model.to(device)
+    # model = model.to(device)
     # print("finish build model")
     
 
@@ -149,6 +157,7 @@ def main():
 
     lf = lambda x: ((1 + math.cos(x * math.pi / cfg.TRAIN.END_EPOCH)) / 2) * \
                    (1 - cfg.TRAIN.LRF) + cfg.TRAIN.LRF  # cosine
+    # lr的缩放因子
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     begin_epoch = cfg.TRAIN.BEGIN_EPOCH
 
@@ -162,39 +171,37 @@ def main():
             begin_epoch = checkpoint['epoch']
             # best_perf = checkpoint['perf']
             last_epoch = checkpoint['epoch']
-            model.load_state_dict(checkpoint['state_dict'])
+            checkpoint['state_dict'] = intersect_dicts(model.state_dict(), checkpoint['state_dict'])
+            model.load_state_dict(checkpoint['state_dict'], strict=False)
             optimizer.load_state_dict(checkpoint['optimizer'])
             logger.info("=> loaded checkpoint '{}' (epoch {})".format(
                 cfg.MODEL.PRETRAINED, checkpoint['epoch']))
-            #cfg.NEED_AUTOANCHOR = False     #disable autoanchor
         
         if os.path.exists(cfg.MODEL.PRETRAINED_DET):
             logger.info("=> loading model weight in det branch from '{}'".format(cfg.MODEL.PRETRAINED))
             det_idx_range = [str(i) for i in range(0,25)]
-            model_dict = model.state_dict()
+            # model_dict = model.state_dict()
             checkpoint_file = cfg.MODEL.PRETRAINED_DET
             checkpoint = torch.load(checkpoint_file)
             begin_epoch = checkpoint['epoch']
             last_epoch = checkpoint['epoch']
+            checkpoint['state_dict'] = intersect_dicts(model.state_dict(), checkpoint['state_dict'])
             checkpoint_dict = {k: v for k, v in checkpoint['state_dict'].items() if k.split(".")[1] in det_idx_range}
-            model_dict.update(checkpoint_dict)
-            model.load_state_dict(model_dict)
+            # model_dict.update(checkpoint_dict)
+            model.load_state_dict(checkpoint['state_dict'], strict=False)
             logger.info("=> loaded det branch checkpoint '{}' ".format(checkpoint_file))
         
         if cfg.AUTO_RESUME and os.path.exists(checkpoint_file):
             logger.info("=> loading checkpoint '{}'".format(checkpoint_file))
             checkpoint = torch.load(checkpoint_file)
             begin_epoch = checkpoint['epoch']
-            # best_perf = checkpoint['perf']
-            last_epoch = checkpoint['epoch']
             model.load_state_dict(checkpoint['state_dict'])
-            # optimizer = get_optimizer(cfg, model)
             optimizer.load_state_dict(checkpoint['optimizer'])
             logger.info("=> loaded checkpoint '{}' (epoch {})".format(
                 checkpoint_file, checkpoint['epoch']))
             #cfg.NEED_AUTOANCHOR = False     #disable autoanchor
-        # model = model.to(device)
 
+        # 下面是根据各个任务区分是否开启梯度
         if cfg.TRAIN.SEG_ONLY:  #Only train two segmentation branchs
             logger.info('freeze encoder and Det head...')
             for k, v in model.named_parameters():
@@ -228,7 +235,6 @@ def main():
                     print('freezing %s' % k)
                     v.requires_grad = False
 
-
         if cfg.TRAIN.LANE_ONLY: 
             logger.info('freeze encoder and Det head and Da_Seg heads...')
             # print(model.named_parameters)
@@ -249,7 +255,6 @@ def main():
         
     if rank == -1 and torch.cuda.device_count() > 1:
         model = torch.nn.DataParallel(model, device_ids=cfg.GPUS)
-        # model = torch.nn.DataParallel(model, device_ids=cfg.GPUS).cuda()
     # # DDP mode
     if rank != -1:
         model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank,find_unused_parameters=True)
@@ -292,6 +297,7 @@ def main():
     )
     num_batch = len(train_loader)
 
+    # load val dataset
     if rank in [-1, 0]:
         valid_dataset = eval('dataset.' + cfg.DATASET.DATASET)(
             cfg=cfg,
@@ -313,6 +319,7 @@ def main():
         )
         print('load data finished')
     
+    # 确认anchor大小
     if rank in [-1, 0]:
         if cfg.NEED_AUTOANCHOR:
             logger.info("begin check anchors")
@@ -330,6 +337,7 @@ def main():
     print('=> start training...')
     for epoch in range(begin_epoch+1, cfg.TRAIN.END_EPOCH+1):
         if rank != -1:
+            # DDP模式下的打乱数据顺序
             train_loader.sampler.set_epoch(epoch)
         # train for one epoch
         train(cfg, train_loader, model, criterion, optimizer, scaler,

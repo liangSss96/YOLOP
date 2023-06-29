@@ -176,11 +176,15 @@ class Detect(nn.Module):
     def __init__(self, nc=13, anchors=(), ch=()):  # detection layer
         super(Detect, self).__init__()
         self.nc = nc  # number of classes
-        self.no = nc + 5  # number of outputs per anchor 85
+        self.no = nc + 5  # number of outputs per anchor x y w h conf cls
         self.nl = len(anchors)  # number of detection layers 3
         self.na = len(anchors[0]) // 2  # number of anchors 3
         self.grid = [torch.zeros(1)] * self.nl  # init grid 
         a = torch.tensor(anchors).float().view(self.nl, -1, 2)
+        '''
+        该方法的作用是定义一组参数，该组参数的特别之处在于：模型训练时不会更新（即调用 optimizer.step() 后该组参数不会变化，
+        只可人为地改变它们的值），但是保存模型时，该组参数又作为模型参数不可或缺的一部分被保存
+        '''
         self.register_buffer('anchors', a)  # shape(nl,na,2)
         self.register_buffer('anchor_grid', a.clone().view(self.nl, 1, -1, 1, 1, 2))  # shape(nl,1,na,1,1,2)
         self.m = nn.ModuleList(nn.Conv2d(x, self.no * self.na, 1) for x in ch)  # output conv  
@@ -212,7 +216,6 @@ class Detect(nn.Module):
 
     @staticmethod
     def _make_grid(nx=20, ny=20):
-        
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
 

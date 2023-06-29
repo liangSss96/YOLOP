@@ -4,14 +4,12 @@ Version: 2.0
 Autor: ls
 Date: 2023-06-12 10:54:11
 LastEditors: ls
-LastEditTime: 2023-06-27 18:47:29
+LastEditTime: 2023-06-28 10:14:50
 '''
 import numpy as np
 import json
 
-import sys
-import os
-# sys.path.append(os.getcwd())
+import torchvision.transforms as transforms
 
 from .convert import convert, id_dict, id_dict_single
 from rich.progress import track
@@ -161,7 +159,13 @@ class BddDataset(AutoDriveDataset):
 
 if __name__ == "__main__":
     from lib.config import cfg
+    normalize = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    )
     print(cfg.TRAIN.SINGLE_CLS)
-    dataset = BddDataset(cfg, True, [640, 640])
+    dataset = BddDataset(cfg, True, [640, 640], transform=transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ]))
     print(len(dataset))
-    print(dataset[0])
+    print(dataset[1][1][1])

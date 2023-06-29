@@ -1,6 +1,9 @@
 import os
 from yacs.config import CfgNode as CN
 
+'''
+红绿灯数据集的图片文件名得以"tl"开头
+'''
 
 _C = CN()
 
@@ -61,7 +64,7 @@ _C.DATASET.DATA_FORMAT = 'jpg'
 _C.DATASET.SELECT_DATA = False
 _C.DATASET.ORG_IMG_SIZE = [720, 1280]
 # LS appended
-_C.DATASET.CLASS_NUMBER = 3
+_C.DATASET.CLASS_NUMBER = 1
 _C.DATASET.CLASS_NAMES = ['car', 'pedestrian', 'cyclist']
 
 # training data augmentation
@@ -80,12 +83,12 @@ _C.DATASET.HSV_V = 0.4  # image HSV-Value augmentation (fraction)
 
 # 是否有相应的数据集
 _C.DATASET.LABELISAVAILABLE = True   # 目标识别标注文件
-_C.DATASET.SEGISAVAILABLE = True     # 可行驶区域标注文件
+_C.DATASET.SEGISAVAILABLE = False     # 可行驶区域标注文件
 _C.DATASET.LLISAVAILABLE = True      # 车道线标注文件
 
 # train
 _C.TRAIN = CN(new_allowed=True)
-_C.TRAIN.SINGLE_CLS = True  # 是否就一个类别
+_C.TRAIN.SINGLE_CLS = False  # 是否就一个类别
 _C.TRAIN.LR0 = 0.001  # initial learning rate (SGD=1E-2, Adam=1E-3)
 _C.TRAIN.LRF = 0.2  # final OneCycleLR learning rate (lr0 * lrf)
 _C.TRAIN.WARMUP_EPOCHS = 3.0
@@ -103,12 +106,12 @@ _C.TRAIN.BEGIN_EPOCH = 0
 _C.TRAIN.END_EPOCH = 240
 
 _C.TRAIN.VAL_FREQ = 1
-_C.TRAIN.BATCH_SIZE_PER_GPU =24
+_C.TRAIN.BATCH_SIZE_PER_GPU =1
 _C.TRAIN.SHUFFLE = True
 _C.TRAIN.AUTOFILL = False
 
 _C.TRAIN.IOU_THRESHOLD = 0.2
-_C.TRAIN.ANCHOR_THRESHOLD = 4.0
+_C.TRAIN.ANCHOR_THRESHOLD = 4.0   
 
 # if training 3 tasks end-to-end, set all parameters as True
 # Alternating optimization
@@ -165,4 +168,4 @@ def update_config(cfg, args):
     #         cfg.DATA_DIR, cfg.TEST.MODEL_FILE
     #     )
 
-    cfg.freeze()
+    cfg.freeze()  # 冻结配置，后续无法修改

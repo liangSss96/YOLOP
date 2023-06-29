@@ -35,8 +35,8 @@ class MultiHeadLoss(nn.Module):
         Returns:
         - total_loss: sum of all the loss
         - head_losses: (tuple) contain all loss[loss1, loss2, ...]
-
         """
+
         # head_losses = [ll
         #                 for l, f, t in zip(self.losses, head_fields, head_targets)
         #                 for ll in l(f, t)]
@@ -81,8 +81,10 @@ class MultiHeadLoss(nn.Module):
 
         # calculate detection loss
         for i, pi in enumerate(predictions[0]):  # layer index, layer predictions
+            # predictions[0] [batchsize,anchor_num,w,h,cof+xywh+cls]?
+            print("nonononono", predictions[0].size())
             b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
-            tobj = torch.zeros_like(pi[..., 0], device=device)  # target obj
+            tobj = torch.zeros_like(pi[..., 0], device=device)  # target obj [batchsize,anchor_num,w,h]
 
             n = b.shape[0]  # number of targets
             if n:

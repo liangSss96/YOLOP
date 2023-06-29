@@ -70,7 +70,7 @@ def random_perspective(cfg, combination, targets=(), degrees=10, translate=.1, s
 
     # Combined rotation matrix
     M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
-    print(M)
+    # print(M)
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
         if perspective:  # perspective 透视变换
             img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
@@ -96,7 +96,7 @@ def random_perspective(cfg, combination, targets=(), degrees=10, translate=.1, s
     if n:
         # warp points
         xy = np.ones((n * 4, 3))
-        print(xy.shape)
+        # print(xy.shape)
         xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
         xy = xy @ M.T  # transform   xy的一行为一个齐次的点
         if perspective:
@@ -190,7 +190,7 @@ def letterbox(combination, new_shape=(640, 640), color=(114, 114, 114), auto=Tru
     
     # Scale ratio (new / old)
     r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-    print("result r: ", r)
+    # print("result r: ", r)
     if not scaleup:  # only scale down, do not scale up (for better test mAP)
         r = min(r, 1.0)
 
