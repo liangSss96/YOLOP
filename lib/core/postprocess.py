@@ -9,14 +9,14 @@ from sklearn.cluster import DBSCAN
 def build_targets(cfg, predictions, targets, model):
     '''
     predictions
-    [16, 3, 32, 32, 85]
+    [16, 3, 32, 32, 85] [batchsize, anchor_num, width, height, conf x y w h class_num]
     [16, 3, 16, 16, 85]
     [16, 3, 8, 8, 85]
     torch.tensor(predictions[i].shape)[[3, 2, 3, 2]]
     [32,32,32,32]
     [16,16,16,16]
     [8,8,8,8]
-    targets[3,x,7]
+    targets[3,x,y,w,h]
     t [index, class, x, y, w, h, head_index]
     t [index, class, x, y, w, h, anchor_index]?
     '''
@@ -26,12 +26,13 @@ def build_targets(cfg, predictions, targets, model):
     # print(type(model))
     # det = model.model[model.detector_index]
     # print(type(det))
-    na, nt = det.na, targets.shape[0]  # number of anchors, targets
+    na, nt = det.na, targets.shape[0]  # number of anchors, number of targets
     tcls, tbox, indices, anch = [], [], [], []
     gain = torch.ones(7, device=targets.device)  # normalized to gridspace gain
     ai = torch.arange(na, device=targets.device).float().view(na, 1).repeat(1, nt)  # same as .repeat_interleave(nt)
+    # repeat多维的复制的话必须维度大于本身的维度，且本身的数据作用于后面的维度
     targets = torch.cat((targets.repeat(na, 1, 1), ai[:, :, None]), 2)  # append anchor indices
-    # targets [index, class, x, y, w, h, anchor_index]?
+    # targets [index, class, x, y, w, h, anchor_index]
     
     g = 0.5  # bias
     # anchor中心点的偏移
@@ -42,7 +43,7 @@ def build_targets(cfg, predictions, targets, model):
     for i in range(det.nl):
         # anchors
         anchors = det.anchors[i] #[3,2]
-        # predictions (3,bs,3,w,w,5+cls)
+        # predictions (3,bs,3,w,h,5+cls)
         gain[2:6] = torch.tensor(predictions[i].shape)[[3, 2, 3, 2]]  # xyxy gain
         # Match targets to anchors  标注的xywh是百分比的，按照此层特征图的大小进行放大
         t = targets * gain
@@ -51,7 +52,7 @@ def build_targets(cfg, predictions, targets, model):
         if nt: # 此batch中有无目标
             # Matches
             r = t[:, :, 4:6] / anchors[:, None]  # wh ratio
-            j = torch.max(r, 1. / r).max(2)[0] < cfg.TRAIN.ANCHOR_THRESHOLD  # compare
+            j = torch.max(r, 1. / r).max(2)[0] < cfg.TRAIN.ANCHOR_THRESHOLD  # compare j[na*nt]
             # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
             t = t[j]  # filter ---> [n,7]
 

@@ -67,6 +67,19 @@ class MultiHeadLoss(nn.Module):
         cfg = self.cfg
         device = targets[0].device
         lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
+        # # Define
+        # b, c = t[:, :2].long().T  # image, class
+        # gxy = t[:, 2:4]  # grid xy
+        # gwh = t[:, 4:6]  # grid wh
+        # gij = (gxy - offsets).long()
+        # gi, gj = gij.T  # grid xy indices
+
+        # # Append
+        # a = t[:, 6].long()  # anchor indices
+        # indices.append((b, a, gj.clamp_(0, gain[3] - 1), gi.clamp_(0, gain[2] - 1)))  # image, anchor, grid indices
+        # tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
+        # anch.append(anchors[a])  # anchors
+        # tcls.append(c)  # class
         tcls, tbox, indices, anchors = build_targets(cfg, predictions[0], targets[0], model)  # targets
 
         # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
