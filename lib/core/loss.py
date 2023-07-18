@@ -93,8 +93,8 @@ class MultiHeadLoss(nn.Module):
         balance = [4.0, 1.0, 0.4] if no == 3 else [4.0, 1.0, 0.4, 0.1]  # P3-5 or P3-6
 
         # calculate detection loss
-        for i, pi in enumerate(predictions[0]):  # layer index, layer predictions
-            # predictions[0] [batchsize,anchor_num,w,h,cof+xywh+cls]?
+        for i, pi in enumerate(predictions[0]):  # layer index, layer predictions 3个检测头
+            # predictions[0] [batchsize,anchor_num,w,h,xywh+conf+cls]?
             print("nonononono", predictions[0].size())
             b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
             tobj = torch.zeros_like(pi[..., 0], device=device)  # target obj [batchsize,anchor_num,w,h]
@@ -102,7 +102,7 @@ class MultiHeadLoss(nn.Module):
             n = b.shape[0]  # number of targets
             if n:
                 nt += n  # cumulative targets
-                ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets
+                ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets   output中拿到正例
 
                 # Regression
                 pxy = ps[:, :2].sigmoid() * 2. - 0.5
@@ -118,6 +118,7 @@ class MultiHeadLoss(nn.Module):
                 # print(model.nc)
                 if model.nc > 1:  # cls loss (only if multiple classes)
                     t = torch.full_like(ps[:, 5:], cn, device=device)  # targets
+                    print("loss_t", t.shape)
                     t[range(n), tcls[i]] = cp
                     lcls += BCEcls(ps[:, 5:], t)  # BCE
             lobj += BCEobj(pi[..., 4], tobj) * balance[i]  # obj loss
@@ -131,7 +132,7 @@ class MultiHeadLoss(nn.Module):
         lseg_ll = BCEseg(lane_line_seg_predicts, lane_line_seg_targets)
 
         metric = SegmentationMetric(2)
-        nb, _, height, width = targets[1].shape
+        nb, _, height, width = targets[1].shape # 前后背景
         pad_w, pad_h = shapes[0][1][1]
         pad_w = int(pad_w)
         pad_h = int(pad_h)

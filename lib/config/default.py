@@ -83,7 +83,7 @@ _C.DATASET.HSV_V = 0.4  # image HSV-Value augmentation (fraction)
 
 # 是否有相应的数据集
 _C.DATASET.LABELISAVAILABLE = True   # 目标识别标注文件
-_C.DATASET.SEGISAVAILABLE = False     # 可行驶区域标注文件
+_C.DATASET.SEGISAVAILABLE = True     # 可行驶区域标注文件
 _C.DATASET.LLISAVAILABLE = True      # 车道线标注文件
 
 # train

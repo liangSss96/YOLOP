@@ -4,10 +4,12 @@ Version: 2.0
 Autor: ls
 Date: 2023-06-12 10:54:11
 LastEditors: ls
-LastEditTime: 2023-06-28 10:14:50
+LastEditTime: 2023-07-18 18:56:56
 '''
 import numpy as np
 import json
+
+from termcolor import colored
 
 import torchvision.transforms as transforms
 
@@ -15,11 +17,12 @@ from .convert import convert, id_dict, id_dict_single
 from rich.progress import track
 
 from .AutoDriveDataset import AutoDriveDataset
+import cv2
 
 class BddDataset(AutoDriveDataset):
     def __init__(self, cfg, is_train, inputsize, transform=None):
         super().__init__(cfg, is_train, inputsize, transform)
-        self.cfg = cfg
+        # self.cfg = cfg
         self.class_dict = cfg.DATASET.CLASS_NAMES
         self.single_cls = cfg.TRAIN.SINGLE_CLS
         self.db = self._get_db_ls()
@@ -93,23 +96,30 @@ class BddDataset(AutoDriveDataset):
         mask: path of the segmetation label
         label: [cls_id, center_x//256, center_y//256, w//256, h//256] 256=IMAGE_SIZE
         """
-        print('building database...')
+        print(colored('Start building the database....','green'))
         gt_db = []
+        # 图片的大小是动态的。需要更改
         height, width = self.shapes  # ORG_IMG_SIZE
         for image_file in track(list(self.img_root.iterdir())):
             image_path = str(image_file)
             mask_path = image_path.replace(str(self.img_root), str(self.mask_root)).replace(".jpg", ".png")
             label_path = image_path.replace(str(self.img_root), str(self.label_root)).replace(".jpg", ".json")
             lane_path = image_path.replace(str(self.img_root), str(self.lane_root)).replace(".jpg", ".png")
-            gt = np.zeros((0, 5))   # 某一个标注文件的gt列表
+            gt = np.zeros((0, 5))   # 某一个标注文件的gt列表  目标识别
+            img = cv2.imread(image_path)
+            height, width = img.shape[:2]
             if self.cfg.DATASET.LABELISAVAILABLE:
                 with open(label_path, 'r') as f:
                     label = json.load(f)
                 data = label['frames'][0]['objects']
+                # 过滤出2D目标
                 data = self.filter_data(data)
+                # 对一个标注文件来说的GT
                 gt = np.zeros((len(data), 5)) 
+                
                 for idx, obj in enumerate(data):
                     category = obj['category']
+                    # kitti数据集中的红绿灯有两级的属性
                     if category == "traffic light":
                         color = obj['attributes']['trafficLightColor']
                         category = "tl_" + color
@@ -136,7 +146,7 @@ class BddDataset(AutoDriveDataset):
             # rec ['image': image_path,'label': gt [[idx, [xywh]], [idx, [xywh]], ..],'mask': mask_path,'lane': lane_path]
 
             gt_db += rec
-        print('database build finish')
+        print(colored('Database building completed....','green'))
         return gt_db
 
     # 过滤类别使用

@@ -258,10 +258,15 @@ class AutoDriveDataset(Dataset):
         cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
         cv2.warpAffine
         """
+
+        # rec ['image': image_path,'label': gt [[idx, [xywh]], [idx, [xywh]], ..],
+        #      'mask': mask_path,'lane': lane_path]
+
         data = self.db[idx]
+        # 表示以彩色模式读取图像。即使图像是带有 alpha 通道的 RGBA 图像，也会将其转换为 BGR 彩色图像。
+        # 忽略图像的方向（orientation）信息。在读取包含方向信息的图像时，不进行自动旋转调整。
         img = cv2.imread(data["image"], cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # print(" load img *****************", img[0][0])
 
         if self.cfg.DATASET.SEGISAVAILABLE:
             if self.cfg.num_seg_class == 3:
@@ -272,36 +277,39 @@ class AutoDriveDataset(Dataset):
             if self.cfg.num_seg_class == 3:
                 seg_label = np.zeros_like(img, dtype=np.uint8)
             else:
-                # print("&&&&&&&&&&&&&&&&&&&&&&&&")
                 seg_label = np.zeros(img.shape[:2], dtype=np.uint8)
-                # print(seg_label)
 
         if self.cfg.DATASET.LLISAVAILABLE:  
             lane_label = cv2.imread(data["lane"], 0)
         else:
             lane_label = np.zeros(img.shape[:2], dtype=np.uint8)
 
+        print('img shape: ', img.shape)
+        print('seg_label shape: ', seg_label.shape)
+        print('lane_label shape: ', lane_label.shape)
 
-        # print(img.shape)
-        # print(lane_label.shape)
-        # print(seg_label.shape)
-
-        resized_shape = self.inputsize   # 模型的输入图像大小
+        # 模型的输入大小
+        resized_shape = self.inputsize
         # if isinstance(resized_shape, list):
         #     resized_shape = max(resized_shape)   # 输入图像的长边
-        h0, w0 = img.shape[:2]  # orig hw
-        r_h, r_w = resized_shape[1] / h0, resized_shape[0] / w0
+
+        h0, w0 = img.shape[:2]  # origin img hw
+        r_h, r_w = resized_shape[1] / h0, resized_shape[0] / w0 # 长宽的缩放比例
         r = min(r_h, r_w)
         # r = resized_shape / max(h0, w0)  
+
         if r != 1:  # always resize down, only resize up if training with augmentation
-            # cv2.INTER_AREA 插值方法来最小化细节损失。而较大的缩放比例可能需要更平滑的插值，因此选择 cv2.INTER_LINEAR 插值方法来实现更平滑的放大效果。
+            # cv2.INTER_AREA 插值方法来最小化细节损失。
+            # 而较大的缩放比例可能需要更平滑的插值，因此选择 cv2.INTER_LINEAR 插值方法来实现更平滑的放大效果。
             interp = cv2.INTER_AREA if r < 1 else cv2.INTER_LINEAR
             img = cv2.resize(img, (int(w0 * r), int(h0 * r)), interpolation=interp)
             seg_label = cv2.resize(seg_label, (int(w0 * r), int(h0 * r)), interpolation=interp)
             lane_label = cv2.resize(lane_label, (int(w0 * r), int(h0 * r)), interpolation=interp)
-        h, w = img.shape[:2]  # 新的尺寸，图像的长宽比前后是不变的
-        # print(" resize img *****************", img[0][0])
-        # print("h, w: ", h, w)
+        h, w = img.shape[:2]  # 新的尺寸，图像的长宽比前后是不变的，不失真的变化
+        print("----------------------------------")
+        print('img shape: ', img.shape)
+        print('seg_label shape: ', seg_label.shape)
+        print('lane_label shape: ', lane_label.shape)
         '''
         TODO
         '''
