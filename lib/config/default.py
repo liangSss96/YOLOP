@@ -53,10 +53,10 @@ _C.LOSS.LL_IOU_GAIN = 0.2 # lane line iou loss gain
 
 # DATASET related params
 _C.DATASET = CN(new_allowed=True)
-_C.DATASET.DATAROOT = '/home/ls/ls_disk/training_data/yolop_data/images'       # the path of images folder
-_C.DATASET.LABELROOT = '/home/ls/ls_disk/training_data/yolop_data/det_annotations'      # the path of det_annotations folder
-_C.DATASET.MASKROOT = '/home/ls/ls_disk/training_data/yolop_data/da_seg_annotations'                # the path of da_seg_annotations folder
-_C.DATASET.LANEROOT = '/home/ls/ls_disk/training_data/yolop_data/da_seg_annotations'               # the path of ll_seg_annotations folder
+_C.DATASET.DATAROOT = '/home/ls/ls_disk/training_data/1/images'       # the path of images folder
+_C.DATASET.LABELROOT = '/home/ls/ls_disk/training_data/1/det_annotations'      # the path of det_annotations folder
+_C.DATASET.MASKROOT = '/home/ls/ls_disk/training_data/1/da_seg_annotations'                # the path of da_seg_annotations folder
+_C.DATASET.LANEROOT = '/home/ls/ls_disk/training_data/1/ll_seg_annotations'               # the path of ll_seg_annotations folder
 _C.DATASET.DATASET = 'BddDataset'
 _C.DATASET.TRAIN_SET = 'train'
 _C.DATASET.TEST_SET = 'val'
@@ -83,8 +83,8 @@ _C.DATASET.HSV_V = 0.4  # image HSV-Value augmentation (fraction)
 
 # 是否有相应的数据集
 _C.DATASET.LABELISAVAILABLE = True   # 目标识别标注文件
-_C.DATASET.SEGISAVAILABLE = True     # 可行驶区域标注文件
-_C.DATASET.LLISAVAILABLE = True      # 车道线标注文件
+_C.DATASET.SEGISAVAILABLE = False     # 可行驶区域标注文件
+_C.DATASET.LLISAVAILABLE = False    # 车道线标注文件
 
 # train
 _C.TRAIN = CN(new_allowed=True)

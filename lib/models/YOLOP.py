@@ -17,6 +17,7 @@ from lib.utils import check_anchor_order
 from lib.core.evaluate import SegmentationMetric
 from lib.utils.utils import time_synchronized
 from lib.config import cfg
+from termcolor import colored
 
 # The lane line and the driving area segment branches without share information with each other and without link
 YOLOP = [
@@ -77,7 +78,7 @@ class MCnet(nn.Module):
         self.nc = 1
         self.detector_index = -1
         self.det_out_idx = block_cfg[0][0]
-        self.seg_out_idx = block_cfg[0][1:]
+        self.seg_out_idx = block_cfg[0][1:] # seg + lane
         self.ll_out_idx = block_cfg[0][-1]
         
 
@@ -91,15 +92,16 @@ class MCnet(nn.Module):
             block_.index, block_.from_ = i, from_
             layers.append(block_)
             save.extend(x % i for x in ([from_] if isinstance(from_, int) else from_) if x != -1)  # append to savelist
+            
         assert self.detector_index == block_cfg[0][0]
 
         self.model, self.save = nn.Sequential(*layers), sorted(save)
         self.names = [str(i) for i in range(self.nc)]
-
+        print(colored(self.save, 'red'))
         # set stride、anchor for detector
         Detector = self.model[self.detector_index]  # detector
         if isinstance(Detector, Detect):
-            s = 128  # 2x min stride
+            s = 128  # 2x min stride 
             # for x in self.forward(torch.zeros(1, 3, s, s)):
             #     print (x.shape)
             with torch.no_grad():

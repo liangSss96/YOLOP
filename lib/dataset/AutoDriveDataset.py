@@ -259,7 +259,7 @@ class AutoDriveDataset(Dataset):
         cv2.warpAffine
         """
 
-        # rec ['image': image_path,'label': gt [[idx, [xywh]], [idx, [xywh]], ..],
+        # rec ['image': image_path,'label': gt [[cls_id, xywh], [cls_id, xywh], ..],
         #      'mask': mask_path,'lane': lane_path]
 
         data = self.db[idx]
@@ -284,9 +284,9 @@ class AutoDriveDataset(Dataset):
         else:
             lane_label = np.zeros(img.shape[:2], dtype=np.uint8)
 
-        print('img shape: ', img.shape)
-        print('seg_label shape: ', seg_label.shape)
-        print('lane_label shape: ', lane_label.shape)
+        # print('img shape: ', img.shape)
+        # print('seg_label shape: ', seg_label.shape)
+        # print('lane_label shape: ', lane_label.shape)
 
         # 模型的输入大小
         resized_shape = self.inputsize
@@ -306,15 +306,16 @@ class AutoDriveDataset(Dataset):
             seg_label = cv2.resize(seg_label, (int(w0 * r), int(h0 * r)), interpolation=interp)
             lane_label = cv2.resize(lane_label, (int(w0 * r), int(h0 * r)), interpolation=interp)
         h, w = img.shape[:2]  # 新的尺寸，图像的长宽比前后是不变的，不失真的变化
-        print("----------------------------------")
-        print('img shape: ', img.shape)
-        print('seg_label shape: ', seg_label.shape)
-        print('lane_label shape: ', lane_label.shape)
+        # print("----------------------------------")
+        # print('img shape: ', img.shape)
+        # print('seg_label shape: ', seg_label.shape)
+        # print('lane_label shape: ', lane_label.shape)
         '''
         TODO
         '''
         (img, seg_label, lane_label), ratio, pad = letterbox((img, seg_label, lane_label), resized_shape, auto=self.cfg.TRAIN.AUTOFILL, scaleup=self.is_train)
         shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
+
         # print(" letterbox img *****************", img[0][0])
         # ratio = (w / w0, h / h0)
         # print(resized_shape)
@@ -342,9 +343,10 @@ class AutoDriveDataset(Dataset):
                 scale=self.cfg.DATASET.SCALE_FACTOR,  # 缩放
                 shear=self.cfg.DATASET.SHEAR  
             )
-            # print(" random_perspective img *****************", img[0][0])
             #print(labels.shape)
-            augment_hsv(img, hgain=self.cfg.DATASET.HSV_H, sgain=self.cfg.DATASET.HSV_S, vgain=self.cfg.DATASET.HSV_V)
+            img_name = data["image"].split("/")[-1]
+            if not img_name.startswith("tl"):
+                augment_hsv(img, hgain=self.cfg.DATASET.HSV_H, sgain=self.cfg.DATASET.HSV_S, vgain=self.cfg.DATASET.HSV_V)
             # img, seg_label, labels = cutout(combination=combination, labels=labels)
             # print(" augment_hsv img *****************", img[0][0])
             if len(labels):
@@ -358,7 +360,7 @@ class AutoDriveDataset(Dataset):
             # if self.is_train:
             # random left-right flip
             # 翻转问题
-            img_name = data["image"].split("/")[-1]
+
             # print(img_name)
             if not img_name.startswith("tl"):
                 lr_flip = self.cfg.DATASET.LR_FLIP
@@ -395,9 +397,6 @@ class AutoDriveDataset(Dataset):
         # 返回一个连续的array，其内存是连续的这通常能够提高计算效率，特别是在涉及大量数据的情况下。
         # 在计算机视觉中，经常需要对图像进行处理，而某些操作要求图像是连续的。
         img = np.ascontiguousarray(img)
-        # seg_label = np.ascontiguousarray(seg_label)
-        # if idx == 0:
-        #     print(seg_label[:,:,0])
         
         # 前后背景的图
         if self.cfg.num_seg_class == 3:
@@ -405,38 +404,52 @@ class AutoDriveDataset(Dataset):
             _,seg1 = cv2.threshold(seg_label[:,:,1],1,255,cv2.THRESH_BINARY)
             _,seg2 = cv2.threshold(seg_label[:,:,2],1,255,cv2.THRESH_BINARY)
         else:
-            _,seg1 = cv2.threshold(seg_label,1,255,cv2.THRESH_BINARY)
-            _,seg2 = cv2.threshold(seg_label,1,255,cv2.THRESH_BINARY_INV)
+            _,seg1 = cv2.threshold(seg_label,1,255,cv2.THRESH_BINARY)  #前景  _ 为true或false
+            _,seg2 = cv2.threshold(seg_label,1,255,cv2.THRESH_BINARY_INV)  #背景
         _,lane1 = cv2.threshold(lane_label,1,255,cv2.THRESH_BINARY)
         _,lane2 = cv2.threshold(lane_label,1,255,cv2.THRESH_BINARY_INV)
-#        _,seg2 = cv2.threshold(seg_label[:,:,2],1,255,cv2.THRESH_BINARY)
+        cv2.imshow('sda', seg1)
+        cv2.waitKey(0)
+        cv2.imshow('sda', lane1)
+        cv2.waitKey(0)
         # # seg1[cutout_mask] = 0
         # # seg2[cutout_mask] = 0
         
-        # seg_label /= 255
-        # seg0 = self.Tensor(seg0)
+
         if self.cfg.num_seg_class == 3:
             seg0 = self.Tensor(seg0)
+        # 一通道的数据会默认加上一维
         seg1 = self.Tensor(seg1)
         seg2 = self.Tensor(seg2)
-        # seg1 = self.Tensor(seg1)
-        # seg2 = self.Tensor(seg2)
         lane1 = self.Tensor(lane1)
         lane2 = self.Tensor(lane2)
 
-        # seg_label = torch.stack((seg2[0], seg1[0]),0)
         if self.cfg.num_seg_class == 3:
             seg_label = torch.stack((seg0[0],seg1[0],seg2[0]),0)
         else:
             seg_label = torch.stack((seg2[0], seg1[0]),0)
-            
         lane_label = torch.stack((lane2[0], lane1[0]),0)
-        # _, gt_mask = torch.max(seg_label, 0)
-        # _ = show_seg_result(img, gt_mask, idx, 0, save_dir='debug', is_gt=True)
-        
 
         target = [labels_out, seg_label, lane_label]
+
+        # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        # weight, height = img.shape[1], img.shape[0]
+        # for obj in target[0]:
+        #     x1 = int((obj[2] - obj[4]/2) * weight)
+        #     y1 = int((obj[3] - obj[5]/2) * height)
+        #     x2 = int(((obj[2] + obj[4]/2) * weight))
+        #     y2 = int((obj[3] + obj[5]/2) * height)
+        #     cv2.rectangle(img, (x1,y1), (x2,y2), color=(0,0,255), thickness=2)
+        # cv2.imshow("test", img)
+        # cv2.waitKey(0)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
         img = self.transform(img)
+
+        # img           : tensor后的图片
+        # target        : [[[0,cls_id, xywh],[0,cls_id, xywh],...], [2*h*w], [2*h*w]]  归一化后的xywh
+        # data["image"] : img_path
+        # shapes        : shapes = (h0, w0) ori_size, ((h / h0, w / w0)(h,w resize_shape), pad(dw, dh))
 
         return img, target, data["image"], shapes
 

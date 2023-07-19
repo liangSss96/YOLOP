@@ -42,7 +42,7 @@ def random_perspective(cfg, combination, targets=(), degrees=10, translate=.1, s
     height = img.shape[0] + border[0] * 2  # shape(h,w,c)
     width = img.shape[1] + border[1] * 2
 
-    # Center   平移  左下角平移到了中心
+    # Center   移动操作中心
     C = np.eye(3)
     C[0, 2] = -img.shape[1] / 2  # x translation (pixels)
     C[1, 2] = -img.shape[0] / 2  # y translation (pixels)
@@ -63,7 +63,7 @@ def random_perspective(cfg, combination, targets=(), degrees=10, translate=.1, s
     S[0, 1] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # x shear (deg)
     S[1, 0] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # y shear (deg)
 
-    # Translation  #平移
+    # Translation  #平移  这一步是将之前平移给逆回去。。。。。。。。。。。。
     T = np.eye(3)
     T[0, 2] = random.uniform(0.5 - translate, 0.5 + translate) * width  # x translation (pixels)
     T[1, 2] = random.uniform(0.5 - translate, 0.5 + translate) * height  # y translation (pixels)
@@ -216,7 +216,8 @@ def letterbox(combination, new_shape=(640, 640), color=(114, 114, 114), auto=Tru
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     # 在上述代码中，img 是需要添加边框的图像。top、bottom、left 和 right 分别表示在每个边界上添加的像素数。
-    #   cv2.BORDER_CONSTANT 表示为边框使用单一颜色，而 color 参数表示所选颜色。在图像的边界上添加边框的效果。这在图像处理中常用于扩展图像大小、填充边缘或创建视觉效果。
+    # cv2.BORDER_CONSTANT 表示为边框使用单一颜色，而 color 参数表示所选颜色。在图像的边界上添加边框的效果。这在图像处理中常用于扩展图像大小、填充边缘或创建视觉效果。
+    #  top >= 0 && bottom >= 0 && left >= 0 && right >= 0 && _src.dims() <= 2 in function 'copyMakeBorder'
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     gray = cv2.copyMakeBorder(gray, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)  # add border
     line = cv2.copyMakeBorder(line, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)  # add border

@@ -35,6 +35,7 @@ from lib.utils.utils import create_logger, select_device
 from lib.utils import run_anchor
 from lib.utils.utils import intersect_dicts
 
+from termcolor import colored
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Multitask network')
@@ -88,7 +89,7 @@ def main():
     global_rank = int(os.environ['RANK']) if 'RANK' in os.environ else -1
 
     rank = global_rank
-    print("RANK: ", rank)
+    # print("RANK: ", rank)
 
     # TODO: handle distributed training logger
     # set the logger, tb_log_dir means tensorboard logdir
@@ -118,7 +119,7 @@ def main():
 
     # bulid up model
     # start_time = time.time()
-    print("begin to bulid up model...")
+    print(colored("begin to bulid up model...", 'green'))
     # DP mode  显示所有gpu的信息
     device = select_device(logger, batch_size=cfg.TRAIN.BATCH_SIZE_PER_GPU* len(cfg.GPUS)) if not cfg.DEBUG \
         else select_device(logger, 'cpu')
@@ -133,7 +134,7 @@ def main():
         # 多GPU通信框架
         dist.init_process_group(backend='nccl', init_method='env://')  # distributed backend
     
-    print("load model to device")
+    print(colored("load model to device", 'green'))
     model = get_net(cfg).to(device)
     # print("load finished")
     # model = model.to(device)

@@ -4,7 +4,7 @@ Version: 2.0
 Autor: ls
 Date: 2023-06-12 10:54:11
 LastEditors: ls
-LastEditTime: 2023-07-18 18:56:56
+LastEditTime: 2023-07-19 14:33:22
 '''
 import numpy as np
 import json
@@ -108,6 +108,7 @@ class BddDataset(AutoDriveDataset):
             gt = np.zeros((0, 5))   # 某一个标注文件的gt列表  目标识别
             img = cv2.imread(image_path)
             height, width = img.shape[:2]
+            print(height, '     ', width)
             if self.cfg.DATASET.LABELISAVAILABLE:
                 with open(label_path, 'r') as f:
                     label = json.load(f)
@@ -143,7 +144,7 @@ class BddDataset(AutoDriveDataset):
                 'lane': lane_path
             }]
 
-            # rec ['image': image_path,'label': gt [[idx, [xywh]], [idx, [xywh]], ..],'mask': mask_path,'lane': lane_path]
+            # rec ['image': image_path,'label': gt [[cls_id, xywh], [cls_id, xywh], ..],'mask': mask_path,'lane': lane_path]
 
             gt_db += rec
         print(colored('Database building completed....','green'))
@@ -178,4 +179,5 @@ if __name__ == "__main__":
             normalize,
         ]))
     print(len(dataset))
-    print(dataset[1][1][1])
+    img, target, img_path, shapes = dataset[2]
+
